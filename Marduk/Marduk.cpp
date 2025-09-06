@@ -10,6 +10,8 @@
 #include <sstream>
 #include <io.h>
 #include <fcntl.h>
+#include <iomanip>
+#include <chrono>
 
 #pragma comment(lib, "NetworkDiagnosticDll.lib")
 

@@ -2,7 +2,7 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>E:\Projects\xdnet_auto_fixer\Marduk\x64\Release\NetworkDiagnosticDll.dll</FullPath>
+      <FullPath>E:\Projects\xdnet_auto_fixer\Marduk\bin\x64\Release\NetworkDiagnosticDll.dll</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />
