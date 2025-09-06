@@ -1,0 +1,13 @@
+vcpkg/
+*.html
+*.log
+
+ZfwInteractionDll_bak/
+
+.vs/
+bin/
+ZfwInteractionDll/x64/
+DNSManagerDll/x64/
+TestApp/x64/
+Marduk/x64/
+NetworkDiagnostic/x64/
