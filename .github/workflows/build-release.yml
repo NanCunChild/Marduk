@@ -37,7 +37,7 @@ jobs:
       uses: lukka/run-vcpkg@v11
       with:
         vcpkgDirectory: '${{ github.workspace }}/vcpkg'
-        vcpkgGitCommitId: '2025.08.27'
+        vcpkgGitCommitId: 'b1e15efef6758eaa0beb0a8732cfa66f6a68a81d'
         vcpkgJsonGlob: 'vcpkg.json'
     
     # 安装依赖包
