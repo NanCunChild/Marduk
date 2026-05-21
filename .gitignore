@@ -5,30 +5,26 @@ pac.txt
 .vscode/
 .vs/
 bin/
-[Bb]uild/
 *.obj
 *.user
-.vs/
 [A-Za-z]*.????????/
 
-ZfwInteractionDll/x64/
-DNSManagerDll/x64/
-TestApp/x64/
-Marduk/x64/
-NetworkDiagnosticDll/x64/
-WifiPortalDll/x64/
+# CMake build directories (covers build/, build-debug/, build-release/, out/)
+[Bb]uild*/
+out/
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake.user
+install_manifest.txt
 
-ZfwInteractionDll/Debug/
-DNSManagerDll/Debug/
-TestApp/Debug/
-Marduk/Debug/
-NetworkDiagnosticDll/Debug/
-WifiPortalDll/Debug/
-
-Debug/
-
-report/
-
+# vcpkg
 vcpkg_installed/
 
+# Misc
+Debug/
+Release/
+x64/
+report/
 target/

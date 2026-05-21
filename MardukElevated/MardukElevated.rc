@@ -1,0 +1,8 @@
+// MardukElevated.rc
+//
+// Embeds the side-by-side application manifest into the executable.
+// Resource name 1 (CREATEPROCESS_MANIFEST_RESOURCE_ID) and resource type
+// 24 (RT_MANIFEST) are the magic IDs that the Windows loader scans for
+// when launching a process. Both MSVC's rc.exe and MinGW's windres
+// understand this directive identically.
+1 24 "MardukElevated.manifest"

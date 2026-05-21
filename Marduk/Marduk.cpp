@@ -4,6 +4,7 @@
 #include <memory>
 #include <locale>
 #include <Windows.h>
+#include <shellapi.h>
 #include <filesystem>
 #include <shlobj.h>
 #include <fstream>

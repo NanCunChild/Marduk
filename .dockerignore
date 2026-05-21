@@ -1,0 +1,14 @@
+# Don't ship CMake build dirs or vcpkg's local install tree into the
+# build context — they're either regenerated in the container or
+# bind-mounted at runtime. Keeps the image build fast.
+[Bb]uild*/
+out/
+vcpkg_installed/
+vcpkg/buildtrees/
+vcpkg/packages/
+vcpkg/downloads/
+.vs/
+.vscode/
+.git/
+*.log
+*.user

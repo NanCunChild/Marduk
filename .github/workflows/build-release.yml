@@ -7,6 +7,7 @@ on:
 
 env:
   BUILD_TYPE: Release
+  # vcpkg 二进制缓存：复用 GitHub Actions cache，避免每次重编 onnxruntime/opencv4
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
 
 jobs:
@@ -19,13 +20,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: recursive  # 拉取 vcpkg 子模块
         fetch-depth: 0
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
-
-    - name: Setup vcpkg cache
+    # vcpkg 二进制缓存所需的 token
+    - name: Setup vcpkg cache env
       uses: actions/github-script@v7
       with:
         script: |
@@ -37,29 +36,29 @@ jobs:
       run: echo "date=$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" >> $env:GITHUB_OUTPUT
       shell: powershell
 
-    - name: Download ONNX model
+    - name: Check ONNX model
       run: |
-        if (!(Test-Path "Marduk\crnn_model.onnx")) {
-          Write-Host "ONNX Model Not Found"
+        if (Test-Path "Marduk\crnn_model.onnx") {
+          Write-Host "ONNX Model present."
         } else {
-          Write-Host "ONNX Model Check Failed"
+          Write-Error "ONNX Model 'Marduk/crnn_model.onnx' not found in repo."
+          exit 1
         }
       shell: powershell
 
-    - name: Build project
-      run: |
-        echo "Building project..."
-        msbuild Marduk.sln ^
-          /p:Configuration=Release ^
-          /p:Platform=x64 ^
-          /verbosity:minimal ^
-          /maxcpucount
-        echo "Build finished."
+    # CMake 已随 windows runner 预装；VS 2026 工具链由 windows-2025-vs2026 提供。
+    # vcpkg.cmake 工具链在首次执行时会自动 bootstrap-vcpkg.bat，无需显式准备。
+    - name: Configure CMake
+      run: cmake --preset default
+      shell: cmd
+
+    - name: Build
+      run: cmake --build --preset release --parallel
       shell: cmd
 
     - name: Verify build outputs
       run: |
-        $OutputDir = "bin\x64\Release"
+        $OutputDir = "build\bin\Release"
 
         Write-Host "Checking build outputs..."
         if (Test-Path $OutputDir) {
@@ -73,9 +72,11 @@ jobs:
 
         $RequiredFiles = @(
           "$OutputDir\Marduk.exe",
-          "$OutputDir\ZfwInteractionDll.dll",
+          "$OutputDir\MardukElevated.exe",
           "$OutputDir\DNSManagerDll.dll",
-          "$OutputDir\NetworkDiagnosticDll.dll"
+          "$OutputDir\NetworkDiagnosticDll.dll",
+          "$OutputDir\WifiPortalDll.dll",
+          "$OutputDir\ZfwInteractionDll.dll"
         )
 
         foreach ($file in $RequiredFiles) {
@@ -88,15 +89,20 @@ jobs:
         Write-Host "All required files present."
       shell: powershell
 
-    - name: Collect runtime dependencies
+    # 兜底：vcpkg 的 applocal 部署已经把第三方 DLL 拷过去；此步只是补全。
+    - name: Collect runtime dependencies (fallback)
       run: |
-        $OutputDir = "bin\x64\Release"
-        $VcpkgBinDir = "vcpkg_installed\x64-windows\bin"
+        $OutputDir = "build\bin\Release"
+        $VcpkgBinDir = "vcpkg_installed\custom-x64-windows\bin"
 
-        Write-Host "Collecting runtime dependencies..."
+        if (-not (Test-Path $VcpkgBinDir)) {
+          $VcpkgBinDir = "vcpkg_installed\x64-windows\bin"
+        }
+
+        Write-Host "Collecting runtime dependencies from $VcpkgBinDir ..."
 
         if (Test-Path $VcpkgBinDir) {
-          $DllFiles = Get-ChildItem "$VcpkgBinDir\*.dll"
+          $DllFiles = Get-ChildItem "$VcpkgBinDir\*.dll" -ErrorAction SilentlyContinue
           foreach ($dll in $DllFiles) {
             Copy-Item $dll.FullName -Destination $OutputDir -Force
             Write-Host "  - copied: $($dll.Name)"
@@ -112,16 +118,16 @@ jobs:
       run: |
         $Version = "${{ github.ref_name }}"
         $PackageName = "Marduk-$Version-Windows-x64"
-        $SourceDir = "bin\x64\Release"
+        $SourceDir = "build\bin\Release"
         $PackageDir = $PackageName
 
         Write-Host "Creating release package: $PackageName"
 
-        New-Item -ItemType Directory -Path $PackageDir -Force
+        New-Item -ItemType Directory -Path $PackageDir -Force | Out-Null
 
         Copy-Item "$SourceDir\*" -Destination $PackageDir -Recurse -Force
 
-        Copy-Item "README.md" -Destination "$PackageDir\README.md" -ErrorAction SilentlyContinue
+        Copy-Item "README.md"   -Destination "$PackageDir\README.md"   -ErrorAction SilentlyContinue
         Copy-Item "LICENCE.txt" -Destination "$PackageDir\LICENCE.txt" -ErrorAction SilentlyContinue
 
         @"
@@ -129,6 +135,7 @@ jobs:
         Version: $Version
         Compile Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
         Compile Env: GitHub Actions (windows-2025-vs2026)
+        Build System: CMake + vcpkg (manifest mode, custom-x64-windows triplet)
         Arch: x64
 
         Usage:
@@ -164,12 +171,12 @@ jobs:
           ## New Version Released
 
           **Release Time**: ${{ steps.date.outputs.date }}
-          **Compile Env**: GitHub Actions (Windows + MSVC)
+          **Compile Env**: GitHub Actions (Windows + MSVC, CMake build)
           **Arch**: Windows x64
 
           ## Download
 
-          - **Full Version**: `Marduk-${{ github.ref_name }}-Windows-x64.zip` 
+          - **Full Version**: `Marduk-${{ github.ref_name }}-Windows-x64.zip`
             - All dependencies included
 
           ## Quick Start
@@ -177,7 +184,7 @@ jobs:
           1. Download and unzip `Marduk-${{ github.ref_name }}-Windows-x64.zip`
           2. Run `Marduk.exe` with Administrator
           3. Type `help` to show all supported commands
-          4. Recommand routes：`login` -> `diagno` -> `pasopt`
+          4. Recommand routes: `login` -> `diagno` -> `pasopt`
 
           ## System Requirements
 
@@ -186,9 +193,9 @@ jobs:
 
           ## Tech Info
 
-          - **C++ **: C++17
-          - **Package Manage**: vcpkg (manifest mode)
-          - **Dependencies**: OpenCV, ONNX Runtime, CPR, Crypto++
+          - **C++**: C++17
+          - **Build**: CMake (>=3.21) + vcpkg (manifest mode)
+          - **Dependencies**: OpenCV, ONNX Runtime, CPR, Crypto++, Qt6
 
           ---
 
@@ -199,4 +206,3 @@ jobs:
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

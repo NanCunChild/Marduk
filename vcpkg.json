@@ -5,17 +5,33 @@
   "builtin-baseline": "67566432ae0e666388f0e1ba108ef68ef5dce589",
   "dependencies": [
     "cpr",
-    "gumbo",
     "nlohmann-json",
-    "tomlplusplus",
-    "cryptopp",
-    "onnxruntime",
-    "opencv4",
-    {
-      "name": "qtbase",
-      "default-features": true,
-      "features": []
+    "tomlplusplus"
+  ],
+  "default-features": [
+    "gui",
+    "heavy"
+  ],
+  "features": {
+    "gui": {
+      "description": "Qt6-based MardukGui front-end",
+      "dependencies": [
+        {
+          "name": "qtbase",
+          "default-features": true,
+          "features": []
+        },
+        "qttools"
+      ]
     },
-    "qttools"
-  ]
+    "heavy": {
+      "description": "ZfwInteractionDll: ONNX captcha recognizer + OpenCV + CryptoPP + Gumbo HTML parser",
+      "dependencies": [
+        "gumbo",
+        "cryptopp",
+        "onnxruntime",
+        "opencv4"
+      ]
+    }
+  }
 }

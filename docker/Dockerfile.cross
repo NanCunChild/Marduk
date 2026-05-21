@@ -1,0 +1,103 @@
+# syntax=docker/dockerfile:1.6
+#
+# Linux→Windows x64 cross-build image for Marduk.
+#
+# Toolchain: MinGW-w64 (POSIX threads) + LLVM windres-compatible.
+# Build driver: CMake + Ninja, vcpkg in manifest mode targeting
+# x64-mingw-dynamic.
+#
+# Build:
+#   docker build -t marduk-cross-builder -f docker/Dockerfile.cross .
+# Run (driven by scripts/cross-build.sh, but works manually too):
+#   docker run --rm -v "$PWD:/workspace" -w /workspace marduk-cross-builder \
+#       cmake --preset linux-cross
+#   docker run --rm -v "$PWD:/workspace" -w /workspace marduk-cross-builder \
+#       cmake --build --preset linux-cross
+
+FROM debian:12-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        zip \
+        unzip \
+        tar \
+        xz-utils \
+        bzip2 \
+        pkg-config \
+        cmake \
+        ninja-build \
+        make \
+        # Native C/C++ compiler for vcpkg's host triplet (x64-linux):
+        # vcpkg builds host-side tools (meson generators, protoc, ...)
+        # against the host triplet during cross-builds.
+        gcc \
+        g++ \
+        python3 \
+        python3-jinja2 \
+        autoconf \
+        automake \
+        libtool \
+        bison \
+        flex \
+        gperf \
+        gettext \
+        nasm \
+        # MinGW-w64 cross toolchain (POSIX threads variant — required for
+        # std::thread / std::mutex used across the codebase). The "-posix"
+        # alternatives are selected by the toolchain file.
+        mingw-w64 \
+        mingw-w64-tools \
+        g++-mingw-w64-x86-64-posix \
+        gcc-mingw-w64-x86-64-posix \
+ && rm -rf /var/lib/apt/lists/*
+
+# Make the POSIX-thread MinGW variant the default behind the unsuffixed
+# names, so any tooling that assumes `x86_64-w64-mingw32-g++` exists
+# transparently gets the working compiler.
+RUN update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix && \
+    update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+
+# Windows headers ship from Microsoft with mixed-case names (Windows.h,
+# WinInet.h, ShlObj.h, ...). NTFS is case-insensitive so MSVC code
+# happily compiles. MinGW-w64 stores them lowercase on Debian's
+# case-sensitive ext4 filesystem, so cross-compiling source authored
+# for MSVC trips on the case mismatch. Generate symlinks for all
+# common mixed-case spellings the project uses now or might use later.
+RUN set -eux; \
+    inc=/usr/x86_64-w64-mingw32/include; \
+    for upper in Windows.h WindowsX.h WinDef.h WinUser.h WinNls.h WinSvc.h \
+                 WinReg.h WinSock.h WinSock2.h WinInet.h WinHttp.h \
+                 WinCrypt.h WinIoCtl.h WinError.h WinBase.h WinNT.h \
+                 ShellAPI.h ShlObj.h ShlObj_core.h ShellScalingApi.h \
+                 ProcessThreadsApi.h FileAPI.h SysInfoApi.h; do \
+        lower="$(echo "$upper" | tr '[:upper:]' '[:lower:]')"; \
+        if [ -e "$inc/$lower" ] && [ ! -e "$inc/$upper" ]; then \
+            ln -s "$lower" "$inc/$upper"; \
+        fi; \
+    done; \
+    # Sanity check
+    test -e "$inc/Windows.h" && test -e "$inc/WinInet.h"
+
+# vcpkg's binary cache lives here; mount a docker volume on this path
+# from the wrapper script so first-build artefacts survive container
+# restarts.
+ENV VCPKG_DEFAULT_BINARY_CACHE=/vcpkg-cache \
+    VCPKG_DISABLE_METRICS=1
+RUN mkdir -p /vcpkg-cache
+
+# A non-root developer UID is convenient for bind-mounted source trees
+# (otherwise build artefacts get root-owned on the host). The wrapper
+# script will pass --user $(id -u):$(id -g), and Debian doesn't need
+# the user to exist in /etc/passwd for that to work.
+
+WORKDIR /workspace
+
+# Default command: print a hint. The real driver is scripts/cross-build.sh.
+CMD ["bash", "-c", "echo 'Run: cmake --preset linux-cross && cmake --build --preset linux-cross'"]

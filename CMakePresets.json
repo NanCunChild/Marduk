@@ -8,29 +8,46 @@
   "configurePresets": [
     {
       "name": "default",
-      "displayName": "x64 Release (vcpkg)",
-      "description": "Build with vcpkg and custom triplet",
+      "displayName": "x64 Release (Windows + vcpkg)",
+      "description": "Native Windows MSVC build with vcpkg manifest mode + custom-x64-windows triplet",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_TARGET_TRIPLET": "custom-x64-windows",
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/custom-triplets",
-        "CMAKE_BUILD_TYPE": "Release",
-        "MARDUK_LIB_DIR": "${sourceDir}/x64/Release"
+        "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
       "name": "debug",
-      "displayName": "x64 Debug (vcpkg)",
-      "description": "Debug build with vcpkg",
+      "inherits": "default",
+      "displayName": "x64 Debug (Windows + vcpkg)",
       "binaryDir": "${sourceDir}/build-debug",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
-        "VCPKG_TARGET_TRIPLET": "custom-x64-windows",
-        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/custom-triplets",
-        "CMAKE_BUILD_TYPE": "Debug",
-        "MARDUK_LIB_DIR": "${sourceDir}/x64/Debug"
+        "CMAKE_BUILD_TYPE": "Debug"
       }
+    },
+    {
+      "name": "linux-cross",
+      "displayName": "Linux → Windows x64 cross (MinGW-w64, lightweight)",
+      "description": "Cross-compile from Linux using MinGW-w64. Heavy targets (Qt6 GUI, ONNX/OpenCV-backed Zfw, Marduk, TestApp) are disabled by default because vcpkg cannot reliably build those ports for MinGW. Produces the 3 lightweight DLLs + MardukElevated.exe.",
+      "binaryDir": "${sourceDir}/build-linux-cross",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/mingw-w64-x86_64.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic",
+        "VCPKG_HOST_TRIPLET": "x64-linux",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/custom-triplets",
+        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
+        "VCPKG_MANIFEST_FEATURES": "",
+        "CMAKE_BUILD_TYPE": "Release",
+        "MARDUK_BUILD_GUI": "OFF",
+        "MARDUK_BUILD_ZFW": "OFF",
+        "MARDUK_BUILD_NETDIAG": "OFF",
+        "VCPKG_APPLOCAL_DEPS": "OFF",
+        "X_VCPKG_APPLOCAL_DEPS_INSTALL": "OFF"
+      },
+      "generator": "Ninja"
     }
   ],
   "buildPresets": [
@@ -43,6 +60,10 @@
       "name": "debug",
       "configurePreset": "debug",
       "configuration": "Debug"
+    },
+    {
+      "name": "linux-cross",
+      "configurePreset": "linux-cross"
     }
   ]
 }
